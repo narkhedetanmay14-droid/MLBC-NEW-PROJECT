@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Logistics ML Blockchain</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header><div><p class="eyebrow">LOCAL ML + ETHEREUM</p><h1>Logistics ML Blockchain</h1><p class="subtitle">Predict delivery time, then record the prediction on a local Ganache blockchain.</p></div><div class="status-grid"><span id="backendStatus" class="status">Backend: checking</span><span id="modelStatus" class="status">Model: checking</span><span id="chainStatus" class="status">Blockchain: checking</span></div></header>
+    <section class="card"><h2>Shipment prediction</h2><form id="predictionForm" class="grid">
+      <label>Distance (km)<input name="distance_km" type="number" step="0.1" value="250" required></label>
+      <label>Package weight (kg)<input name="package_weight_kg" type="number" step="0.1" value="10" required></label>
+      <label>Traffic level (1-10)<input name="traffic_level" type="number" min="1" max="10" value="7" required></label>
+      <label>Weather score (1-10)<input name="weather_score" type="number" min="1" max="10" value="8" required></label>
+      <label>Vehicle age (years)<input name="vehicle_age_years" type="number" min="0" step="0.1" value="3" required></label>
+      <label>Driver experience (years)<input name="driver_experience_years" type="number" min="0" step="0.1" value="5" required></label>
+      <label>Warehouse delay (hours)<input name="warehouse_delay_hours" type="number" min="0" step="0.1" value="1" required></label>
+      <label>Loading time (hours)<input name="loading_time_hours" type="number" min="0" step="0.1" value="2" required></label>
+      <label>Priority (1-3)<input name="priority_level" type="number" min="1" max="3" value="2" required></label>
+      <button type="submit">Predict delivery time</button>
+    </form><div id="predictionBox" class="result">No prediction yet.</div></section>
+    <section class="card"><h2>Blockchain record</h2><div class="record-row"><label>Shipment ID<input id="shipmentId" value="SHIP-001" maxlength="64"></label><button id="recordButton" disabled>Record prediction on blockchain</button></div><div id="txBox" class="result">Run a prediction first.</div></section>
+    <section class="card"><h2>System status</h2><pre id="statusDetails">Checking...</pre></section>
+  </main>
+<script>
+let latestPrediction=null;
+const $=id=>document.getElementById(id);
+async function api(url,options={}){const r=await fetch(url,options); const data=await r.json().catch(()=>({success:false,error:'Invalid server response'})); if(!r.ok) throw new Error(data.error||'Request failed'); return data;}
+function setStatus(el,ok,text){el.textContent=text;el.className='status '+(ok?'ok':'bad');}
+async function refresh(){try{const h=await api('/api/health');setStatus($('backendStatus'),true,'Backend: online');setStatus($('modelStatus'),h.model,'Model: '+(h.model?'ready':'missing'));setStatus($('chainStatus'),h.blockchain,'Blockchain: '+(h.blockchain?'connected':'offline'));$('statusDetails').textContent=JSON.stringify(h,null,2);}catch(e){setStatus($('backendStatus'),false,'Backend: offline');$('statusDetails').textContent=e.message;}}
+$('predictionForm').addEventListener('submit',async e=>{e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());for(const k in data)data[k]=Number(data[k]);$('predictionBox').textContent='Predicting...';try{const r=await api('/api/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});latestPrediction=r.prediction_hours;$('predictionBox').textContent=`Predicted delivery time: ${r.prediction_hours} hours (${r.model})`;$('recordButton').disabled=false;$('txBox').textContent='Prediction ready to record on blockchain.';}catch(err){$('predictionBox').textContent='Error: '+err.message;}});
+$('recordButton').addEventListener('click',async()=>{try{const id=$('shipmentId').value.trim();$('recordButton').disabled=true;$('txBox').textContent='Sending transaction...';const r=await api('/api/blockchain/record',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shipment_id:id,prediction_hours:latestPrediction})});$('txBox').textContent=`Recorded. Tx: ${r.transaction_hash}
+Block: ${r.block_number}
+Contract: ${r.contract_address}`;await refresh();}catch(err){$('txBox').textContent='Blockchain error: '+err.message;}finally{$('recordButton').disabled=!latestPrediction;}});
+refresh();
+</script>
+</body></html>

@@ -1,0 +1,8 @@
+{
+  "network": "development",
+  "rpc_url": "http://127.0.0.1:7545",
+  "chain_id": 5777,
+  "contract_address": "0xcfC5d30eB504Fdfe61d692EAC532AbB963Ce90bC",
+  "contract_name": "Logistics",
+  "abi_path": "blockchain/build/contracts/Logistics.json"
+}
